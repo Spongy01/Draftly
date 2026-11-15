@@ -53,3 +53,21 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return fields;
 }
+
+/** Trim and lowercase first, then validate, so " Bob@Example.com " is accepted and normalized. */
+const normalizedEmail = z
+  .string({ error: "Email is required" })
+  .trim()
+  .toLowerCase()
+  .pipe(z.email({ error: "Enter a valid email address" }));
+
+/** POST /api/documents/[id]/share */
+export const shareSchema = z.strictObject({
+  email: normalizedEmail,
+  role: z.enum(["VIEWER", "EDITOR"], { error: "Role must be VIEWER or EDITOR" }),
+});
+
+/** DELETE /api/documents/[id]/share */
+export const removeShareSchema = z.strictObject({
+  userId: z.string({ error: "userId is required" }).min(1, "userId is required"),
+});

@@ -3,6 +3,8 @@ import {
   CONTENT_MAX_BYTES,
   fieldErrors,
   isContentTooLarge,
+  removeShareSchema,
+  shareSchema,
   titleSchema,
   updateDocumentSchema,
 } from "../src/lib/validation";
@@ -108,5 +110,57 @@ describe("isContentTooLarge", () => {
 
   it("is true once the character count alone exceeds the limit", () => {
     expect(isContentTooLarge("a".repeat(CONTENT_MAX_BYTES + 1))).toBe(true);
+  });
+});
+
+describe("shareSchema", () => {
+  it("normalizes the email (trim + lowercase)", () => {
+    expect(shareSchema.parse({ email: "  Bob@Draftly.TEST ", role: "VIEWER" })).toEqual({
+      email: "bob@draftly.test",
+      role: "VIEWER",
+    });
+  });
+
+  it("accepts both roles", () => {
+    expect(shareSchema.safeParse({ email: "a@b.co", role: "VIEWER" }).success).toBe(true);
+    expect(shareSchema.safeParse({ email: "a@b.co", role: "EDITOR" }).success).toBe(true);
+  });
+
+  it("rejects an invalid role (including lowercase and OWNER)", () => {
+    for (const role of ["viewer", "OWNER", "ADMIN", "", 1, null]) {
+      const r = shareSchema.safeParse({ email: "a@b.co", role });
+      expect(r.success).toBe(false);
+      if (!r.success) expect(fieldErrors(r.error).role).toBe("Role must be VIEWER or EDITOR");
+    }
+  });
+
+  it("rejects an invalid or empty email", () => {
+    for (const email of ["", "   ", "not-an-email", "a@", "@b.co"]) {
+      const r = shareSchema.safeParse({ email, role: "VIEWER" });
+      expect(r.success).toBe(false);
+      if (!r.success) expect(fieldErrors(r.error).email).toBeTruthy();
+    }
+  });
+
+  it("rejects missing fields", () => {
+    expect(shareSchema.safeParse({ role: "VIEWER" }).success).toBe(false);
+    expect(shareSchema.safeParse({ email: "a@b.co" }).success).toBe(false);
+  });
+
+  it("rejects unknown keys", () => {
+    expect(shareSchema.safeParse({ email: "a@b.co", role: "VIEWER", userId: "x" }).success).toBe(false);
+  });
+});
+
+describe("removeShareSchema", () => {
+  it("accepts { userId }", () => {
+    expect(removeShareSchema.parse({ userId: "abc" })).toEqual({ userId: "abc" });
+  });
+
+  it("rejects empty, missing, non-string and extra keys", () => {
+    expect(removeShareSchema.safeParse({ userId: "" }).success).toBe(false);
+    expect(removeShareSchema.safeParse({}).success).toBe(false);
+    expect(removeShareSchema.safeParse({ userId: 5 }).success).toBe(false);
+    expect(removeShareSchema.safeParse({ userId: "a", role: "VIEWER" }).success).toBe(false);
   });
 });
