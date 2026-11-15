@@ -8,11 +8,13 @@ import {
   hasUnsaved,
   initialState,
   recordEdit,
+  sendBlocked,
   sendFailed,
   sendSucceeded,
   shouldSend,
   startSend,
   type AutosaveState,
+  type BlockReason,
   type SaveStatus,
 } from "./autosave";
 
@@ -21,17 +23,18 @@ const DEBOUNCE_MS = 1000;
 export function useAutosave(docId: string, enabled: boolean) {
   const router = useRouter();
   const stateRef = useRef<AutosaveState>(initialState());
-  const [view, setView] = useState<{ status: SaveStatus; error: string | null }>({
-    status: "idle",
-    error: null,
-  });
+  const [view, setView] = useState<{
+    status: SaveStatus;
+    error: string | null;
+    blocked: BlockReason | null;
+  }>({ status: "idle", error: null, blocked: null });
   const latestHtml = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
   const apply = useCallback((next: AutosaveState) => {
     stateRef.current = next;
-    setView({ status: displayStatus(next), error: next.error });
+    setView({ status: displayStatus(next), error: next.error, blocked: next.blocked });
   }, []);
 
   const flush = useCallback(async () => {
@@ -53,13 +56,14 @@ export function useAutosave(docId: string, enabled: boolean) {
         router.replace("/login");
         return;
       }
+      if (res.status === 403 || res.status === 404) {
+        // Access was downgraded (403) or removed (404): stop for good, keep the text on screen.
+        apply(sendBlocked(stateRef.current, started.seq, res.status === 403 ? "forbidden" : "gone"));
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        const fallback =
-          res.status === 403
-            ? "You no longer have permission to edit this document."
-            : "Could not save your changes.";
-        apply(sendFailed(stateRef.current, started.seq, data?.error ?? fallback));
+        apply(sendFailed(stateRef.current, started.seq, data?.error ?? "Could not save your changes."));
         return;
       }
       apply(sendSucceeded(stateRef.current, started.seq));
@@ -83,6 +87,7 @@ export function useAutosave(docId: string, enabled: boolean) {
       latestHtml.current = html;
       apply(recordEdit(stateRef.current));
       clearTimeout(timer.current);
+      if (stateRef.current.blocked) return; // access lost: don't schedule more saves
       timer.current = setTimeout(() => void flushRef.current(), DEBOUNCE_MS);
     },
     [apply, enabled],
@@ -111,5 +116,5 @@ export function useAutosave(docId: string, enabled: boolean) {
     };
   }, []);
 
-  return { status: view.status, error: view.error, notifyEdit, flush: retry };
+  return { status: view.status, error: view.error, blocked: view.blocked, notifyEdit, flush: retry };
 }
