@@ -4,7 +4,7 @@
 
 Draftly is a small collaborative document editor: sign in, write rich text, import a file as a new document, and share a document with another user as a viewer or an editor. It was built as a 4-hour take-home. I chose a narrow slice and made it solid instead of covering every feature. `docs/ARCHITECTURE.md` explains what I prioritized and cut, and `docs/AI_WORKFLOW.md` describes how I used AI tools while building it.
 
-Live URL: <LIVE_URL>
+Live URL: https://draftly-eight-livid.vercel.app/login
 
 Stack: Next.js 16 (App Router, TypeScript), Tailwind, Prisma 6 on Neon Postgres, TipTap, zod, bcryptjs + jose, sanitize-html, mammoth, marked, Vitest. Deployed on Vercel.
 
@@ -57,7 +57,7 @@ npm run dev                # http://localhost:3000
 Alternatively, clone the repository first, then run the same steps from the cloned folder:
 
 ```bash
-git clone <repo-url> draftly
+git clone https://github.com/Spongy01/Draftly draftly
 cd draftly
 ```
 

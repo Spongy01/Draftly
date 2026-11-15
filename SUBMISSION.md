@@ -2,7 +2,7 @@
 
 Draftly: a lightweight collaborative document editor, built for a 4-hour take-home.
 
-Live URL: <LIVE_URL>
+Live URL: https://draftly-eight-livid.vercel.app/login
 
 Note: the database is on Neon's free tier, which suspends when idle. The first request after a pause can take a few seconds. Refresh once if the first load is slow or fails.
 
