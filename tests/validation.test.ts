@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fieldErrors, renameSchema, titleSchema } from "../src/lib/validation";
+import {
+  CONTENT_MAX_BYTES,
+  fieldErrors,
+  isContentTooLarge,
+  titleSchema,
+  updateDocumentSchema,
+} from "../src/lib/validation";
 
 describe("titleSchema", () => {
   it("trims whitespace", () => {
@@ -30,28 +36,77 @@ describe("titleSchema", () => {
   });
 });
 
-describe("renameSchema", () => {
+describe("updateDocumentSchema", () => {
   it("accepts { title } and returns the trimmed value", () => {
-    expect(renameSchema.parse({ title: " New name " })).toEqual({ title: "New name" });
+    expect(updateDocumentSchema.parse({ title: " New name " })).toEqual({ title: "New name" });
   });
 
-  it("rejects extra keys such as contentHtml", () => {
-    expect(renameSchema.safeParse({ title: "ok", contentHtml: "<p>x</p>" }).success).toBe(false);
+  it("accepts { contentHtml } alone", () => {
+    expect(updateDocumentSchema.parse({ contentHtml: "<p>Hi</p>" })).toEqual({
+      contentHtml: "<p>Hi</p>",
+    });
   });
 
-  it("rejects a missing title", () => {
-    expect(renameSchema.safeParse({}).success).toBe(false);
+  it("accepts both fields together", () => {
+    const r = updateDocumentSchema.safeParse({ title: "T", contentHtml: "" });
+    expect(r.success).toBe(true);
   });
 
-  it("produces a field message for an empty title", () => {
-    const r = renameSchema.safeParse({ title: "   " });
+  it("accepts an empty-string contentHtml (clearing the document)", () => {
+    expect(updateDocumentSchema.safeParse({ contentHtml: "" }).success).toBe(true);
+  });
+
+  it("rejects an empty object (at least one field required)", () => {
+    const r = updateDocumentSchema.safeParse({});
+    expect(r.success).toBe(false);
+    if (!r.success) expect(fieldErrors(r.error)._).toBe("Provide a title or contentHtml");
+  });
+
+  it("rejects unknown keys", () => {
+    expect(updateDocumentSchema.safeParse({ title: "ok", ownerId: "x" }).success).toBe(false);
+    expect(updateDocumentSchema.safeParse({ contentHtml: "x", id: "y" }).success).toBe(false);
+  });
+
+  it("rejects non-string contentHtml", () => {
+    const r = updateDocumentSchema.safeParse({ contentHtml: 5 });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(fieldErrors(r.error).contentHtml).toBe("Content must be a string");
+  });
+
+  it("still validates the title when sent with content", () => {
+    const r = updateDocumentSchema.safeParse({ title: "   ", contentHtml: "<p>x</p>" });
     expect(r.success).toBe(false);
     if (!r.success) expect(fieldErrors(r.error).title).toBe("Title is required");
   });
 
   it("produces a field message for an over-long title", () => {
-    const r = renameSchema.safeParse({ title: "a".repeat(121) });
+    const r = updateDocumentSchema.safeParse({ title: "a".repeat(121) });
     expect(r.success).toBe(false);
     if (!r.success) expect(fieldErrors(r.error).title).toMatch(/120/);
+  });
+
+  it("rejects contentHtml over 500 KB but accepts exactly 500 KB", () => {
+    expect(updateDocumentSchema.safeParse({ contentHtml: "a".repeat(CONTENT_MAX_BYTES) }).success).toBe(true);
+    const r = updateDocumentSchema.safeParse({ contentHtml: "a".repeat(CONTENT_MAX_BYTES + 1) });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(fieldErrors(r.error).contentHtml).toMatch(/500 KB/);
+  });
+});
+
+describe("isContentTooLarge", () => {
+  it("is false for non-strings and small strings", () => {
+    expect(isContentTooLarge(undefined)).toBe(false);
+    expect(isContentTooLarge(123)).toBe(false);
+    expect(isContentTooLarge("<p>hi</p>")).toBe(false);
+  });
+
+  it("counts bytes, not characters, for multi-byte text", () => {
+    // 3-byte characters: 175,000 chars = 525,000 bytes > 512,000 (500 KB)
+    expect(isContentTooLarge("€".repeat(175_000))).toBe(true);
+    expect(isContentTooLarge("€".repeat(100_000))).toBe(false);
+  });
+
+  it("is true once the character count alone exceeds the limit", () => {
+    expect(isContentTooLarge("a".repeat(CONTENT_MAX_BYTES + 1))).toBe(true);
   });
 });
