@@ -1,3 +1,5 @@
+This is the original plan. See docs/ARCHITECTURE.md, "Plan vs. as built", for what changed.
+
 # Draftly: MVP Plan
 
 ## 1. Product summary
