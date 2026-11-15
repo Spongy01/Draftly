@@ -1,4 +1,4 @@
-// Document page (no editor yet): title with inline rename, role badge, placeholder body
+// Document page: title with inline rename, role badge, rich-text editor with autosave
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireDocumentAccess } from "@/lib/guard";
@@ -7,6 +7,7 @@ import { getOwnerName } from "@/lib/documents";
 import LocalTime from "@/components/ui/LocalTime";
 import RoleBadge from "@/components/ui/RoleBadge";
 import RenameTitle from "./RenameTitle";
+import DocumentView from "./DocumentView";
 
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,8 +34,12 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
         Updated <LocalTime iso={g.doc.updatedAt.toISOString()} />
       </p>
 
-      <div className="mt-8 flex min-h-64 items-center justify-center rounded border border-dashed border-gray-400 p-6 text-sm opacity-70">
-        The editor will appear here.
+      <div className="mt-8">
+        <DocumentView
+          docId={g.doc.id}
+          initialHtml={g.doc.contentHtml}
+          canEdit={canEdit(g.access)}
+        />
       </div>
     </main>
   );
