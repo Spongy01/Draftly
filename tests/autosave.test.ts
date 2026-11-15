@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  BLOCKED_MESSAGES,
   displayStatus,
   hasUnsaved,
   initialState,
   isDirty,
   recordEdit,
+  sendBlocked,
   sendFailed,
   sendSucceeded,
   shouldSend,
@@ -171,6 +173,74 @@ describe("autosave state machine", () => {
     let s = recordEdit(initialState());
     const a = begin(s);
     s = sendSucceeded(a.state, a.seq);
+    expect(shouldSend(s)).toBe(false);
+  });
+});
+
+describe("blocked state (access lost: 403 / 404)", () => {
+  it.each([
+    ["forbidden", "You no longer have edit access"],
+    ["gone", "This document is no longer shared with you"],
+  ] as const)("%s: shows blocked and the right message", (reason, message) => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendBlocked(a.state, a.seq, reason);
+    expect(displayStatus(s)).toBe("blocked");
+    expect(s.blocked).toBe(reason);
+    expect(BLOCKED_MESSAGES[reason]).toBe(message);
+    expect(s.inFlight).toBeNull();
+  });
+
+  it.each(["forbidden", "gone"] as const)("%s: stops sending even though edits are unsaved", (reason) => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendBlocked(a.state, a.seq, reason);
+    expect(isDirty(s)).toBe(true);
+    expect(shouldSend(s)).toBe(false); // no retry loop
+  });
+
+  it("further typing stays blocked and never re-enables sending", () => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendBlocked(a.state, a.seq, "gone");
+    for (let i = 0; i < 5; i++) s = recordEdit(s);
+    expect(shouldSend(s)).toBe(false);
+    expect(displayStatus(s)).toBe("blocked");
+  });
+
+  it("still warns before leaving, since the unsaved text would be lost", () => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendBlocked(a.state, a.seq, "forbidden");
+    expect(hasUnsaved(s)).toBe(true);
+  });
+
+  it("blocked wins over the error state", () => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendFailed(a.state, a.seq, "boom"); // earlier failure
+    const b = begin(s);
+    s = sendBlocked(b.state, b.seq, "gone");
+    expect(displayStatus(s)).toBe("blocked");
+    expect(s.error).toBeNull();
+  });
+
+  it("a blocked response from a stale request is ignored", () => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = sendFailed(a.state, a.seq, "boom");
+    const b = begin(s); // request 2 in flight
+    const afterStale = sendBlocked(b.state, a.seq, "gone");
+    expect(afterStale).toBe(b.state);
+    expect(afterStale.blocked).toBeNull();
+  });
+
+  it("an edit made in flight does not trigger a follow-up once blocked", () => {
+    let s = recordEdit(initialState());
+    const a = begin(s);
+    s = recordEdit(a.state); // typed while in flight
+    s = sendBlocked(s, a.seq, "forbidden");
+    expect(isDirty(s)).toBe(true);
     expect(shouldSend(s)).toBe(false);
   });
 });
