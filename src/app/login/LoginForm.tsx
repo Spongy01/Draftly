@@ -41,7 +41,7 @@ export default function LoginForm() {
           type="email"
           required
           autoComplete="email"
-          className="rounded border border-gray-300 px-3 py-2 text-base text-black"
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-base text-black"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -51,7 +51,7 @@ export default function LoginForm() {
           type="password"
           required
           autoComplete="current-password"
-          className="rounded border border-gray-300 px-3 py-2 text-base text-black"
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-base text-black"
         />
       </label>
       {error && (
@@ -62,7 +62,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="rounded border border-gray-500 bg-black px-4 py-2 text-white disabled:opacity-50"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
