@@ -1,0 +1,20 @@
+Team Meeting Agenda
+
+Date: Friday
+Location: Room 4
+Facilitator: Sam
+
+Welcome and introductions
+Quick round of updates from everyone.
+Please keep each update under two minutes.
+
+Project status
+The R&D <draft> is ready for review.
+Design and engineering are on track.
+
+Open items
+Pricing page copy
+Onboarding emails
+Support rota for launch week
+
+Wrap up and next steps

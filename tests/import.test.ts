@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { hasTextContent, importFile } from "../src/lib/import";
 import { MESSAGES, UPLOAD_MAX_BYTES, extensionOf } from "../src/lib/import/constants";
@@ -246,5 +248,84 @@ describe("importFile", () => {
     expect(extensionOf("a.TXT")).toBe(".txt");
     expect(extensionOf("dir.d/file")).toBe("");
     expect(extensionOf(".bashrc")).toBe("");
+  });
+});
+
+describe("sample fixture files (demo imports)", () => {
+  const read = (name: string) => new Uint8Array(readFileSync(join(__dirname, "fixtures", name)));
+  const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+  describe("project_notes.md", async () => {
+    const r = await importFile({ name: "project_notes.md", bytes: read("project_notes.md") });
+    const html = r.ok ? r.html : "";
+
+    it("imports successfully with a title derived from the filename", () => {
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.title).toBe(titleFromFilename("project_notes.md"));
+        expect(r.title).toBe("project notes");
+      }
+    });
+
+    it("keeps h1, h2, h3, strong, em, ul and ol", () => {
+      for (const tag of ["<h1>", "<h2>", "<h3>", "<strong>", "<em>", "<ul>", "<ol>"]) {
+        expect(html, tag).toContain(tag);
+      }
+      expect(count(html, "<h2>")).toBe(3);
+      expect(count(html, "<li>")).toBe(7); // 3 bullets + 4 numbered
+    });
+
+    it("contains no script, img or table tags", () => {
+      for (const tag of ["<script", "<img", "<table"]) {
+        expect(html, tag).not.toContain(tag);
+      }
+    });
+
+    it("turns the code block into a paragraph with br between lines", () => {
+      expect(html).toMatch(/<p>git tag -a v0\.1\.0 -m [^<]*<br \/>git push origin v0\.1\.0<\/p>/);
+      expect(html).not.toContain("<pre");
+      expect(html).not.toContain("<code");
+    });
+
+    it("turns the blockquote into a plain paragraph and the link into its text", () => {
+      expect(html).toContain("<p>Ship the smallest thing that teaches us something.</p>");
+      expect(html).not.toContain("<blockquote");
+      expect(html).toContain("launch checklist");
+      expect(html).not.toContain("<a ");
+      expect(html).not.toContain("href");
+    });
+  });
+
+  describe("meeting_agenda.txt", async () => {
+    const r = await importFile({ name: "meeting_agenda.txt", bytes: read("meeting_agenda.txt") });
+    const html = r.ok ? r.html : "";
+
+    it("imports successfully with a title derived from the filename", () => {
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.title).toBe(titleFromFilename("meeting_agenda.txt"));
+        expect(r.title).toBe("meeting agenda");
+      }
+    });
+
+    it("has one paragraph per blank-line separated block", () => {
+      expect(count(html, "<p>")).toBe(6);
+      expect(count(html, "</p>")).toBe(6);
+    });
+
+    it("keeps single line breaks inside paragraphs as br", () => {
+      // blocks of 3, 3, 3 and 4 lines give 2 + 2 + 2 + 3 line breaks
+      expect(count(html, "<br />")).toBe(9);
+      expect(html).toContain("<p>Date: Friday<br />Location: Room 4<br />Facilitator: Sam</p>");
+    });
+
+    it("escapes R&D <draft> exactly once", () => {
+      expect(count(html, "R&amp;D")).toBe(1);
+      expect(count(html, "&lt;draft&gt;")).toBe(1);
+      expect(html).not.toContain("&amp;amp;");
+      expect(html).not.toContain("&amp;lt;");
+      expect(html).not.toContain("&amp;gt;");
+      expect(html).not.toContain("<draft>");
+    });
   });
 });
