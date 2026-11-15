@@ -70,4 +70,52 @@ describe("sanitizeContent", () => {
   it("returns an empty string for empty input", () => {
     expect(sanitizeContent("")).toBe("");
   });
+
+  describe("idempotence (autosave re-sanitizes editor HTML repeatedly)", () => {
+    const inputs = [
+      "<h1>Title</h1><p>Hello <strong>bold</strong>, <em>italic</em> and <u>underlined</u>.</p>",
+      "<ul><li>one</li><li>two <strong>b</strong></li></ul><ol><li>1</li><li>2</li></ol>",
+      "<p>Line one<br>line two</p><h2>Sub</h2><h3>Smaller</h3>",
+      "<p>Tom &amp; Jerry &lt;3 &gt; everyone</p>",
+      '<div style="x"><span>unwrapped</span></div><p onclick="e()">kept</p><script>bad()</script>',
+      "<p></p>",
+      "",
+    ];
+
+    it.each(inputs)("sanitize(sanitize(x)) === sanitize(x): %s", (x) => {
+      const once = sanitizeContent(x);
+      expect(sanitizeContent(once)).toBe(once);
+    });
+
+    it("stays stable across many passes", () => {
+      let out = sanitizeContent(inputs[3]);
+      const first = out;
+      for (let i = 0; i < 25; i++) out = sanitizeContent(out);
+      expect(out).toBe(first);
+    });
+  });
+
+  describe("special characters are not double-escaped", () => {
+    it("keeps &amp; as &amp; after repeated saves", () => {
+      let out = "<p>Tom &amp; Jerry</p>";
+      for (let i = 0; i < 5; i++) out = sanitizeContent(out);
+      expect(out).toBe("<p>Tom &amp; Jerry</p>");
+      expect(out).not.toContain("&amp;amp;");
+    });
+
+    it("keeps &lt; and &gt; as-is after repeated saves", () => {
+      let out = "<p>a &lt; b &gt; c</p>";
+      for (let i = 0; i < 5; i++) out = sanitizeContent(out);
+      expect(out).toBe("<p>a &lt; b &gt; c</p>");
+      expect(out).not.toContain("&amp;lt;");
+      expect(out).not.toContain("&amp;gt;");
+    });
+
+    it("does not double-escape a mix of entities, quotes and unicode", () => {
+      const html = "<p>R&amp;D &lt;draft&gt; &quot;quoted&quot; caf\u00e9 \u20ac5 &amp;amp; literal</p>";
+      const once = sanitizeContent(html);
+      expect(sanitizeContent(sanitizeContent(once))).toBe(once);
+      expect(once).toContain("&amp;amp; literal");
+    });
+  });
 });
