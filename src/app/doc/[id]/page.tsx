@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireDocumentAccess } from "@/lib/guard";
-import { canEdit } from "@/lib/access";
+import { canEdit, canManage } from "@/lib/access";
 import { getOwnerName } from "@/lib/documents";
 import LocalTime from "@/components/ui/LocalTime";
 import RoleBadge from "@/components/ui/RoleBadge";
 import RenameTitle from "./RenameTitle";
 import DocumentView from "./DocumentView";
+import ShareDialog from "./ShareDialog";
 
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +29,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <RenameTitle docId={g.doc.id} initialTitle={g.doc.title} canEdit={canEdit(g.access)} />
         <RoleBadge access={g.access} />
+        {canManage(g.access) && <ShareDialog docId={g.doc.id} />}
       </div>
       <p className="mt-1 text-xs opacity-70">
         {ownerName && <>Owned by {ownerName} &middot; </>}
