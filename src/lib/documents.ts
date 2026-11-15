@@ -51,6 +51,17 @@ export async function getOwnerName(ownerId: string): Promise<string> {
   return owner?.name ?? "Unknown";
 }
 
-export async function renameDocument(id: string, title: string): Promise<DocSummary> {
-  return db.document.update({ where: { id }, data: { title }, select: summarySelect });
+/** Updates title and/or contentHtml. Callers must sanitize contentHtml first. */
+export async function updateDocument(
+  id: string,
+  changes: { title?: string; contentHtml?: string },
+): Promise<DocSummary> {
+  return db.document.update({
+    where: { id },
+    data: {
+      ...(changes.title !== undefined && { title: changes.title }),
+      ...(changes.contentHtml !== undefined && { contentHtml: changes.contentHtml }),
+    },
+    select: summarySelect,
+  });
 }
