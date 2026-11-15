@@ -6,6 +6,7 @@ import { listDocumentsForUser } from "@/lib/documents";
 import LocalTime from "@/components/ui/LocalTime";
 import RoleBadge from "@/components/ui/RoleBadge";
 import LogoutButton from "./LogoutButton";
+import ImportButton from "./ImportButton";
 import NewDocumentButton from "./NewDocumentButton";
 
 export default async function DashboardPage() {
@@ -27,8 +28,9 @@ export default async function DashboardPage() {
         <LogoutButton />
       </header>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap items-start gap-x-6 gap-y-3">
         <NewDocumentButton />
+        <ImportButton />
       </div>
 
       <section className="mt-10">
