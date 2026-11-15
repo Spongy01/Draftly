@@ -7,9 +7,16 @@ export type SharedDocSummary = DocSummary & { role: Role; ownerName: string };
 
 const summarySelect = { id: true, title: true, updatedAt: true } as const;
 
-export async function createDocument(ownerId: string): Promise<DocSummary> {
+export async function createDocument(
+  ownerId: string,
+  init: { title?: string; contentHtml?: string } = {},
+): Promise<DocSummary> {
   return db.document.create({
-    data: { title: "Untitled document", contentHtml: "", ownerId },
+    data: {
+      title: init.title ?? "Untitled document",
+      contentHtml: init.contentHtml ?? "",
+      ownerId,
+    },
     select: summarySelect,
   });
 }
