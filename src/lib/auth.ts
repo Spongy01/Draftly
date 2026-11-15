@@ -1,10 +1,9 @@
 // Session helpers: sign/verify JWT, httpOnly cookie, current user
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
 import { db } from "@/lib/db";
+import { SESSION_SECONDS, signSessionToken, verifySessionToken } from "@/lib/session-token";
 
 export const SESSION_COOKIE = "draftly_session";
-const SESSION_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 function getKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -14,17 +13,8 @@ function getKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function createSessionToken(userId: string): Promise<string> {
-  return new SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(userId)
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_SECONDS}s`)
-    .sign(getKey());
-}
-
 export async function setSessionCookie(userId: string): Promise<void> {
-  const token = await createSessionToken(userId);
+  const token = await signSessionToken(userId, getKey());
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -46,18 +36,20 @@ export async function clearSessionCookie(): Promise<void> {
 
 export type CurrentUser = { id: string; email: string; name: string };
 
-/** Reads and verifies the session cookie. Returns null if absent/invalid/user gone. */
+/**
+ * Reads and verifies the session cookie. Returns null when there is no cookie, the token is
+ * invalid or expired, or the user no longer exists. Database errors are NOT caught here: they
+ * propagate so Next shows the error page instead of silently treating the user as signed out.
+ */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, getKey(), { algorithms: ["HS256"] });
-    if (!payload.sub) return null;
-    return await db.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, name: true },
-    });
-  } catch {
-    return null;
-  }
+
+  const userId = await verifySessionToken(token, getKey()); // only token problems become null
+  if (!userId) return null;
+
+  return db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true },
+  });
 }
